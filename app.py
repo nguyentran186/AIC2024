@@ -9,6 +9,7 @@ import glob
 import torch
 from PIL import Image
 import os
+import csv
 
 import gensim.downloader as api
 
@@ -45,7 +46,7 @@ def load_resources():
     #### Load Model #####
     device = "cuda" if torch.cuda.is_available() else "cpu"
     visual_encoder, _, visual_preprocess = open_clip.create_model_and_transforms('ViT-L-14', device=device, pretrained='datacomp_xl_s13b_b90k')
-    text_encoder = api.load("word2vec-google-news-300")
+    # text_encoder = api.load("word2vec-google-news-300")
 
     frames_index = faiss.read_index(frame_index_path)
     tag_index = faiss.read_index(tag_index_path)
@@ -81,30 +82,30 @@ def load_resources():
     visual_embeddings = frame_to_feature_map          
                     
     # Tags embedding
-    tag_embedding = dict()
-    for part in sorted(os.listdir(keyframes_dir)):
-        data_part = part.split('_')[-1]  # Extract data part like L01, L02
-        if data_part[0] == 'L':
-            data_part_path = f'{keyframes_dir}/{data_part}'
-            video_dirs = sorted(os.listdir(data_part_path))
+    # tag_embedding = dict()
+    # for part in sorted(os.listdir(keyframes_dir)):
+    #     data_part = part.split('_')[-1]  # Extract data part like L01, L02
+    #     if data_part[0] == 'L':
+    #         data_part_path = f'{keyframes_dir}/{data_part}'
+    #         video_dirs = sorted(os.listdir(data_part_path))
 
-            # Iterate through each video directory
-            for video_dir in video_dirs:
-                if video_dir[0] != 'V':
-                    continue
-                vid_dir = video_dir[0:4]
-                json_file_path = os.path.join(data_part_path, video_dir)
+    #         # Iterate through each video directory
+    #         for video_dir in video_dirs:
+    #             if video_dir[0] != 'V':
+    #                 continue
+    #             vid_dir = video_dir[0:4]
+    #             json_file_path = os.path.join(data_part_path, video_dir)
 
-                # Open and read the JSON file
-                with open(json_file_path, 'r') as json_file:
-                    json_data = json.load(json_file)
+    #             # Open and read the JSON file
+    #             with open(json_file_path, 'r') as json_file:
+    #                 json_data = json.load(json_file)
                 
-                # Merge JSON data into the main dictionary
-                for frame, tags in json_data.items():
-                    new_key = f'{data_part}_{vid_dir}_{frame}'  # Create a new key
-                    tag_embedding[new_key] = tags
+    #             # Merge JSON data into the main dictionary
+    #             for frame, tags in json_data.items():
+    #                 new_key = f'{data_part}_{vid_dir}_{frame}'  # Create a new key
+    #                 tag_embedding[new_key] = tags
 
-    tag_embeddings = {key: embed_tags(tags, text_encoder) for key, tags in tag_embedding.items()}
+    # tag_embeddings = {key: embed_tags(tags, text_encoder) for key, tags in tag_embedding.items()}
     
     # OCR embedding
     keyframes_dir = 'dict/ocr'
@@ -142,8 +143,59 @@ def initialize():
     if not initialized:
         initialized = True
         load_resources()
+@app.route('/export', methods=['POST'], strict_slashes=False)
+def export_csv():
+    data = request.get_json()
+    img_list = data.get('images')
+    qa_data = data.get('textData')
+    qno_data = data.get('questionData')
+    
+    with open('dict/keyframes_mapping.json', 'r') as f:
+        key_frame_mapping = json.load(f)
         
-
+    real_video_mapping = []
+    
+    if len(qa_data) == 0:
+        for video_name in img_list:
+            split = video_name.split('_')
+            video_real_name = f'{split[0]}_{split[1]}'
+            frame_index = str(int(split[2]))
+            # Get the mapping for the video if it exists
+            video_mapping = key_frame_mapping.get(video_real_name)
+            if video_mapping:
+                frame = video_mapping.get(frame_index)
+                # Append the video name and its mapping to the real_video_mapping list
+                real_video_mapping.append((video_real_name,frame))
+    else:
+        for video_name in img_list:
+            split = video_name.split('_')
+            video_real_name = f'{split[0]}_{split[1]}'
+            frame_index = str(int(split[2]))
+            # Get the mapping for the video if it exists
+            video_mapping = key_frame_mapping.get(video_real_name)
+            if video_mapping:
+                frame = video_mapping.get(frame_index)
+                # Append the video name and its mapping to the real_video_mapping list
+                real_video_mapping.append((video_real_name,frame,qa_data))
+    
+    output_dir = 'submission'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    if len(qno_data) != 0:
+        csv_name = f'query-{qno_data}-kis.csv' if len(qa_data) == 0 else f'query-{qno_data}-qa.csv'
+    else:
+        csv_name = "untiled.csv"
+    csv_file_path = os.path.join(output_dir, csv_name)
+    # Write to CSV
+    with open(csv_file_path, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        
+        # Write the rows
+        for row in real_video_mapping:
+            writer.writerow(row)
+    
+    return "CSV Exported Successfully"
+    
 @app.route('/search', methods=['POST'], strict_slashes=False)
 def text_search():
     print("text search")
