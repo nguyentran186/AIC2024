@@ -36,7 +36,7 @@ def load_resources():
     print("Loading resource")
     global visual_encoder, text_encoder, frames_index, tag_index, visual_embeddings, tag_embeddings, ocr_data
 
-    frame_index_path = "dict/faiss_trans.bin"
+    frame_index_path = "dict/faiss_trans_b2.bin"
     tag_index_path = "dict/faiss_tag.bin"
 
     dataset_base_dir = 'AI-Challenge-fe/public/data/keyframes_trans/'
@@ -57,7 +57,6 @@ def load_resources():
     # Loop over each L0x directory
     for level_dir in sorted(os.listdir(dataset_base_dir)):
         level_id = level_dir
-        
         # Loop over each video directory within the L0x directory
         for video_dir in sorted(os.listdir(os.path.join(dataset_base_dir, level_dir))):
             video_id = video_dir
@@ -150,7 +149,7 @@ def export_csv():
     qa_data = data.get('textData')
     qno_data = data.get('questionData')
     
-    with open('dict/keyframes_mapping.json', 'r') as f:
+    with open('dict/keyframes_official.json', 'r') as f:
         key_frame_mapping = json.load(f)
         
     real_video_mapping = []
