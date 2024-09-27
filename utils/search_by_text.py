@@ -60,7 +60,7 @@ def search_by_sequence(query_sequence, visual_encoder, frames_index, visual_embe
                 for frame in candidate_frames:
                     frame_level, frame_video, frame_index = frame.split('_')
                     frame_index = int(frame_index)
-                    if frame_level == selected_frame_level and frame_video == selected_frame_video and frame_index > selected_frame_index and frame_index <= selected_frame_index+10:
+                    if frame_level == selected_frame_level and frame_video == selected_frame_video and frame_index > selected_frame_index and frame_index <= selected_frame_index+10*(i+1):
                         find = True
                         temp.append(selected_frame)
             
