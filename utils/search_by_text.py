@@ -56,13 +56,12 @@ def search_by_sequence(query_sequence, visual_encoder, frames_index, visual_embe
             for selected_frame in selected_frames:
                 selected_frame_level, selected_frame_video, selected_frame_index = selected_frame.split('_')
                 selected_frame_index = int(selected_frame_index)
-                find = False
                 for frame in candidate_frames:
                     frame_level, frame_video, frame_index = frame.split('_')
                     frame_index = int(frame_index)
-                    if frame_level == selected_frame_level and frame_video == selected_frame_video and frame_index > selected_frame_index and frame_index <= selected_frame_index+10*(i+1):
-                        find = True
-                        temp.append(selected_frame)
+                    if frame_level == selected_frame_level and frame_video == selected_frame_video:
+                        if frame_index > selected_frame_index+10*(i-1) and frame_index <= selected_frame_index+10*i:
+                            temp.append(selected_frame)
             
             selected_frames = temp
     print(f"Cmn: {selected_frames}")
