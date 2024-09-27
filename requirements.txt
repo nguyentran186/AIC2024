@@ -1,0 +1,12 @@
+deep_translator==1.11.4
+faiss_cpu==1.8.0.post1
+Flask==3.0.3
+Flask_Cors==5.0.0
+gensim==4.3.3
+h5py==3.11.0
+numpy==2.1.1
+Pillow==10.4.0
+rapidfuzz==3.9.7
+Requests==2.32.3
+torch==2.4.0
+tqdm==4.66.5

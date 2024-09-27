@@ -37,3 +37,36 @@ def search_by_text(query_tags, model, index, embeddings, top_k=5, translate=Fals
         results.append(key)
     
     return results, indices[0]
+
+
+def search_by_sequence(query_sequence, visual_encoder, frames_index, visual_embeddings, translate):
+    prompt_k = 100
+    selected_frames = None
+    for i, query in enumerate(query_sequence):
+        candidate_frames, _ = search_by_text(query, visual_encoder, frames_index, visual_embeddings, top_k=prompt_k*(len(query_sequence)-i), translate=translate)
+        if selected_frames is None:
+            selected_frames = candidate_frames
+        else:
+            # for frame in candidate_frames:
+            #     frame_level, frame_video, frame_index = frame.split('_')
+            #     for selected_frame in selected_frames:
+            #         selected_frame_level, selected_frame_video, selected_frame_index = selected_frame.split('_')
+            #         if frame_level == selected_frame_level and frame_video == selected_frame_video and frame_index > selected_frame_index:
+            temp = []
+            for selected_frame in selected_frames:
+                selected_frame_level, selected_frame_video, selected_frame_index = selected_frame.split('_')
+                selected_frame_index = int(selected_frame_index)
+                find = False
+                for frame in candidate_frames:
+                    frame_level, frame_video, frame_index = frame.split('_')
+                    frame_index = int(frame_index)
+                    if frame_level == selected_frame_level and frame_video == selected_frame_video and frame_index > selected_frame_index and frame_index <= selected_frame_index+10:
+                        find = True
+                        temp.append(selected_frame)
+            
+            selected_frames = temp
+    print(f"Cmn: {selected_frames}")
+    return selected_frames
+                        
+
+    

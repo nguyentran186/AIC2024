@@ -17,7 +17,7 @@ import gensim.downloader as api
 from flask_cors import CORS
 from flask import Flask, request, jsonify
 from utils.search_by_tag import search_tags, embed_tags
-from utils.search_by_text import search_by_text
+from utils.search_by_text import search_by_text, search_by_sequence
 from utils.search_by_ocr import search_by_ocr
 from utils.search_by_image import search_by_image
 # Initialize Flask app
@@ -42,7 +42,7 @@ def load_resources():
     tag_index_path = "dict/faiss_tag.bin"
 
     dataset_base_dir = 'AI-Challenge-fe/public/data/keyframes_trans/'
-    npy_base_dir = 'data_extraction/CLIP_features/'
+    npy_base_dir = 'dict/CLIP_features/CLIP_features'
     keyframes_dir = 'dict/tags/'
 
     #### Load Model #####
@@ -109,30 +109,30 @@ def load_resources():
     # tag_embeddings = {key: embed_tags(tags, text_encoder) for key, tags in tag_embedding.items()}
     
     # OCR embedding
-    keyframes_dir = 'dict/ocr'
-    ocr_data = dict()
-    for part in sorted(os.listdir(keyframes_dir)):
-        data_part = part.split('_')[-1]  # Extract data part like L01, L02
-        if data_part[0] == 'L':
-            data_part_path = f'{keyframes_dir}/{data_part}'
-            video_dirs = sorted(os.listdir(data_part_path))
+    # keyframes_dir = 'dict/ocr'
+    # ocr_data = dict()
+    # for part in sorted(os.listdir(keyframes_dir)):
+    #     data_part = part.split('_')[-1]  # Extract data part like L01, L02
+    #     if data_part[0] == 'L':
+    #         data_part_path = f'{keyframes_dir}/{data_part}'
+    #         video_dirs = sorted(os.listdir(data_part_path))
     
-            # Iterate through each video directory
-            for video_dir in video_dirs:
-                if video_dir[0] != 'V':
-                    continue
-                vid_dir = video_dir[0:4]
-                json_file_path = os.path.join(data_part_path, video_dir)
+    #         # Iterate through each video directory
+    #         for video_dir in video_dirs:
+    #             if video_dir[0] != 'V':
+    #                 continue
+    #             vid_dir = video_dir[0:4]
+    #             json_file_path = os.path.join(data_part_path, video_dir)
     
-                # Open and read the JSON file
-                with open(json_file_path, 'r') as json_file:
-                    json_data = json.load(json_file)
+    #             # Open and read the JSON file
+    #             with open(json_file_path, 'r') as json_file:
+    #                 json_data = json.load(json_file)
                 
-                # Merge JSON data into the main dictionary
-                for frame, tags in json_data.items():
-                    new_key = f'{data_part}_{vid_dir}_{int(frame):03d}'  # Create a new key
-                    ocr_data[new_key] = tags
-    ocr_data = {key: ' '.join(value) for key, value in ocr_data.items()}
+    #             # Merge JSON data into the main dictionary
+    #             for frame, tags in json_data.items():
+    #                 new_key = f'{data_part}_{vid_dir}_{int(frame):03d}'  # Create a new key
+    #                 ocr_data[new_key] = tags
+    # ocr_data = {key: ' '.join(value) for key, value in ocr_data.items()}
 
 # Load the models before handling any requests
 
@@ -282,6 +282,12 @@ def image_search():
     image_results, image_indices = search_by_image(image, visual_encoder, visual_preprocess, frames_index, visual_embeddings)
     return jsonify(image_results)
     
+@app.route('/search_by_sequence', methods=['POST'], strict_slashes=False)    
+def sequence_search():
+    data = request.get_json()
+    image_results = search_by_sequence(data['queries'], visual_encoder, frames_index, visual_embeddings, True)
+    return jsonify(image_results)
+
 
 # Running app
 if __name__ == '__main__':
