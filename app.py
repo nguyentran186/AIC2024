@@ -10,6 +10,7 @@ import torch
 from PIL import Image
 import os
 import csv
+import cv2
 
 import gensim.downloader as api
 
@@ -18,6 +19,7 @@ from flask import Flask, request, jsonify
 from utils.search_by_tag import search_tags, embed_tags
 from utils.search_by_text import search_by_text
 from utils.search_by_ocr import search_by_ocr
+from utils.search_by_image import search_by_image
 # Initialize Flask app
 app = Flask(__name__, template_folder='templates')
 CORS(app)
@@ -34,7 +36,7 @@ ocr_data = None
 
 def load_resources():
     print("Loading resource")
-    global visual_encoder, text_encoder, frames_index, tag_index, visual_embeddings, tag_embeddings, ocr_data
+    global visual_encoder, text_encoder, frames_index, tag_index, visual_embeddings, tag_embeddings, ocr_data, visual_preprocess
 
     frame_index_path = "dict/faiss_trans_b2.bin"
     tag_index_path = "dict/faiss_tag.bin"
@@ -49,7 +51,7 @@ def load_resources():
     # text_encoder = api.load("word2vec-google-news-300")
 
     frames_index = faiss.read_index(frame_index_path)
-    tag_index = faiss.read_index(tag_index_path)
+    # tag_index = faiss.read_index(tag_index_path)
     # Key frames embedding
     # Initialize the mapping dictionary
     frame_to_feature_map = {}
@@ -259,6 +261,26 @@ def text_search():
         print("Searching by prompt")
         prompt_results, prompt_indices = search_by_text(prompt_query, visual_encoder, frames_index, visual_embeddings, prompt_k, translate)
         return jsonify(prompt_results)
+    
+@app.route('/search_by_image', methods=['POST'], strict_slashes=False)
+def image_search():
+    print("image search")
+
+    # Check if 'image' is in the request.files
+    if 'image' not in request.files:
+        return jsonify({"error": "No image part in the request"}), 400
+
+    image_file = request.files['image']  # Get the uploaded image
+
+    if image_file.filename == '':
+        return jsonify({"error": "No image selected"}), 400
+    
+    image_bytes = image_file.read()
+    np_image = np.frombuffer(image_bytes, np.uint8)
+    image = cv2.imdecode(np_image, cv2.IMREAD_COLOR)
+    
+    image_results, image_indices = search_by_image(image, visual_encoder, visual_preprocess, frames_index, visual_embeddings)
+    return jsonify(image_results)
     
 
 # Running app
