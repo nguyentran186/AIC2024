@@ -45,27 +45,23 @@ def search_by_sequence(query_sequence, visual_encoder, frames_index, visual_embe
     for i, query in enumerate(query_sequence):
         candidate_frames, _ = search_by_text(query, visual_encoder, frames_index, visual_embeddings, top_k=prompt_k*(len(query_sequence)-i), translate=translate)
         if selected_frames is None:
-            selected_frames = candidate_frames
+            selected_frames = [(f, int(f.split('_')[2])) for f in candidate_frames]
         else:
-            # for frame in candidate_frames:
-            #     frame_level, frame_video, frame_index = frame.split('_')
-            #     for selected_frame in selected_frames:
-            #         selected_frame_level, selected_frame_video, selected_frame_index = selected_frame.split('_')
-            #         if frame_level == selected_frame_level and frame_video == selected_frame_video and frame_index > selected_frame_index:
             temp = []
             for selected_frame in selected_frames:
-                selected_frame_level, selected_frame_video, selected_frame_index = selected_frame.split('_')
-                selected_frame_index = int(selected_frame_index)
+                selected_frame_level, selected_frame_video, _ = selected_frame[0].split('_')
+                selected_frame_index = int(selected_frame[1])
                 for frame in candidate_frames:
                     frame_level, frame_video, frame_index = frame.split('_')
                     frame_index = int(frame_index)
                     if frame_level == selected_frame_level and frame_video == selected_frame_video:
-                        if frame_index > selected_frame_index+10*(i-1) and frame_index <= selected_frame_index+10*i:
-                            temp.append(selected_frame)
+                        if frame_index > selected_frame_index and frame_index <= selected_frame_index+10:
+                            temp.append((selected_frame[0], frame_index))
+                            break
             
             selected_frames = temp
     print(f"Cmn: {selected_frames}")
-    return selected_frames
+    return [f[0] for f in selected_frames]
                         
 
     
