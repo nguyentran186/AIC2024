@@ -11,6 +11,7 @@ from PIL import Image
 import os
 import csv
 import cv2
+import sys
 
 import gensim.downloader as api
 
@@ -20,6 +21,13 @@ from utils.search_by_tag import search_tags, embed_tags
 from utils.search_by_text import search_by_text, search_by_sequence
 from utils.search_by_ocr import search_by_ocr
 from utils.search_by_image import search_by_image
+from utils.search_by_sketch_text import search_by_sketch_text
+
+
+sys.path.append('./tsbir/code')
+from clip.model import convert_weights, CLIP
+from clip.clip import _transform, load
+
 # Initialize Flask app
 app = Flask(__name__, template_folder='templates')
 CORS(app)
@@ -28,18 +36,51 @@ CORS(app)
 visual_encoder = None
 text_encoder = None
 frames_index = None
+frame_task_index = None
 tag_index = None
 visual_embeddings = None
 tag_embeddings = None
 first_request = True
 ocr_data = None
+sketch_text_encoder = None
+task_preprocess = None
+
+
+
+def load_sketch_text_encoder():
+    model_config_file = './tsbir/code/training/model_configs/ViT-B-16.json'
+    model_file = './tsbir/model/tsbir_model_final.pt'
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    # device = "cpu"
+    print(f"Check device load sketch and text: {device}")
+
+    with open(model_config_file, 'r') as f:
+        model_info = json.load(f)
+            
+    model = CLIP(**model_info)
+
+    checkpoint = torch.load(model_file, map_location=device)
+
+    sd = checkpoint["state_dict"]
+    if next(iter(sd.items()))[0].startswith('module'):
+        sd = {k[len('module.'):]: v for k, v in sd.items()}
+
+    model.load_state_dict(sd, strict=False)
+
+    model.eval()
+
+    model = model.to(device)
+    convert_weights(model)
+    preprocess_val = _transform(model.visual.input_resolution, is_train=False)
+
+    return model, preprocess_val
 
 def load_resources():
     print("Loading resource")
-    global visual_encoder, text_encoder, frames_index, tag_index, visual_embeddings, tag_embeddings, ocr_data, visual_preprocess
+    global visual_encoder, text_encoder, frames_index, tag_index, visual_embeddings, tag_embeddings, ocr_data, visual_preprocess, sketch_text_encoder, frame_task_index, task_preprocess
 
-    frame_index_path = "dict/faiss_trans_b2.bin"
-    tag_index_path = "dict/faiss_tag.bin"
+    frame_index_path = "dict/faiss_trans_b3.bin"
+    frame_task_path = "dict/faiss_TASK.bin"
 
     dataset_base_dir = 'AI-Challenge-fe/public/data/keyframes_trans/'
     npy_base_dir = 'dict/CLIP_features/CLIP_features'
@@ -47,10 +88,13 @@ def load_resources():
 
     #### Load Model #####
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    # device = "cpu"
+    print("Check device load resource: ", device)
     visual_encoder, _, visual_preprocess = open_clip.create_model_and_transforms('ViT-L-14', device=device, pretrained='datacomp_xl_s13b_b90k')
     # text_encoder = api.load("word2vec-google-news-300")
 
     frames_index = faiss.read_index(frame_index_path)
+    frame_task_index = faiss.read_index(frame_task_path)
     # tag_index = faiss.read_index(tag_index_path)
     # Key frames embedding
     # Initialize the mapping dictionary
@@ -66,7 +110,8 @@ def load_resources():
             # Load the features from the corresponding npy file
             npy_file_path = os.path.join(npy_base_dir, level_id, f'{video_id}.npy')
             if os.path.exists(npy_file_path):
-                features = np.load(npy_file_path)
+                # features = np.load(npy_file_path)
+                features = ""
             else:
                 print(f"Warning: Missing npy file for {level_id}_{video_id}")
                 continue
@@ -79,63 +124,12 @@ def load_resources():
                 if frame_file.endswith('.jpg'):
                     frame_index = os.path.splitext(frame_file)[0]
                     key = f"{level_id}_{video_id}_{frame_index}"
-                    frame_to_feature_map[key] = features[i].reshape(1,-1)
-    visual_embeddings = frame_to_feature_map          
-                    
-    # Tags embedding
-    # tag_embedding = dict()
-    # for part in sorted(os.listdir(keyframes_dir)):
-    #     data_part = part.split('_')[-1]  # Extract data part like L01, L02
-    #     if data_part[0] == 'L':
-    #         data_part_path = f'{keyframes_dir}/{data_part}'
-    #         video_dirs = sorted(os.listdir(data_part_path))
-
-    #         # Iterate through each video directory
-    #         for video_dir in video_dirs:
-    #             if video_dir[0] != 'V':
-    #                 continue
-    #             vid_dir = video_dir[0:4]
-    #             json_file_path = os.path.join(data_part_path, video_dir)
-
-    #             # Open and read the JSON file
-    #             with open(json_file_path, 'r') as json_file:
-    #                 json_data = json.load(json_file)
-                
-    #             # Merge JSON data into the main dictionary
-    #             for frame, tags in json_data.items():
-    #                 new_key = f'{data_part}_{vid_dir}_{frame}'  # Create a new key
-    #                 tag_embedding[new_key] = tags
-
-    # tag_embeddings = {key: embed_tags(tags, text_encoder) for key, tags in tag_embedding.items()}
-    
-    # OCR embedding
-    # keyframes_dir = 'dict/ocr'
-    # ocr_data = dict()
-    # for part in sorted(os.listdir(keyframes_dir)):
-    #     data_part = part.split('_')[-1]  # Extract data part like L01, L02
-    #     if data_part[0] == 'L':
-    #         data_part_path = f'{keyframes_dir}/{data_part}'
-    #         video_dirs = sorted(os.listdir(data_part_path))
-    
-    #         # Iterate through each video directory
-    #         for video_dir in video_dirs:
-    #             if video_dir[0] != 'V':
-    #                 continue
-    #             vid_dir = video_dir[0:4]
-    #             json_file_path = os.path.join(data_part_path, video_dir)
-    
-    #             # Open and read the JSON file
-    #             with open(json_file_path, 'r') as json_file:
-    #                 json_data = json.load(json_file)
-                
-    #             # Merge JSON data into the main dictionary
-    #             for frame, tags in json_data.items():
-    #                 new_key = f'{data_part}_{vid_dir}_{int(frame):03d}'  # Create a new key
-    #                 ocr_data[new_key] = tags
-    # ocr_data = {key: ' '.join(value) for key, value in ocr_data.items()}
-
-# Load the models before handling any requests
-
+                    # frame_to_feature_map[key] = features[i].reshape(1,-1)
+                    frame_to_feature_map[key] = ""
+    visual_embeddings = frame_to_feature_map  
+    print("TASK model and preprocess")
+    sketch_text_encoder, task_preprocess = load_sketch_text_encoder() 
+    print("Loaded resource")
 
 initialized = False
 @app.before_request
@@ -285,8 +279,14 @@ def image_search():
 @app.route('/search_by_sequence', methods=['POST'], strict_slashes=False)    
 def sequence_search():
     data = request.get_json()
-    image_results = search_by_sequence(data['queries'], visual_encoder, frames_index, visual_embeddings, True)
+    image_results = search_by_sequence(data['queries'], visual_encoder, frames_index, visual_embeddings, False)
     return jsonify(image_results)
+
+@app.route('/search_by_sketch_text', methods=['POST'], strict_slashes=False)
+def sketch_text_search():
+    data = request.get_json()
+    image_results = search_by_sketch_text(data, sketch_text_encoder, task_preprocess, frame_task_index, visual_embeddings)
+    return jsonify(image_results[0])
 
 
 # Running app

@@ -40,7 +40,7 @@ def search_by_text(query_tags, model, index, embeddings, top_k=5, translate=Fals
 
 
 def search_by_sequence(query_sequence, visual_encoder, frames_index, visual_embeddings, translate):
-    prompt_k = 100
+    prompt_k = 200
     selected_frames = None
     for i, query in enumerate(query_sequence):
         candidate_frames, _ = search_by_text(query, visual_encoder, frames_index, visual_embeddings, top_k=prompt_k*(len(query_sequence)-i), translate=translate)
