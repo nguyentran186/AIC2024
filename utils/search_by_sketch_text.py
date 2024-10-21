@@ -7,7 +7,7 @@ import base64
 from PIL import Image
 import io
 from deep_translator import GoogleTranslator
-
+translator = GoogleTranslator(source='vi', target='en')
 
 sys.path.append('./tsbir/code')
 
@@ -47,18 +47,24 @@ def search_by_sketch_text(data, model, task_preprocess, indexes, embeddings):
     # Create a white background image
     white_bg = Image.new("RGBA", image.size, "WHITE")
 
-    # Paste the original image onto the white background
-    white_bg.paste(image, (0, 0), image)
+    if image.mode == 'RGBA':
+        # Paste the image using itself as a mask for the alpha channel
+        white_bg.paste(image, (0, 0), mask=image)
+    else:
+        # If no transparency, paste directly
+        white_bg.paste(image, (0, 0))
 
     # Convert back to RGB to remove transparency
     data['sketch'] = white_bg.convert('RGB')
     
     # Save for testing
     data['sketch'].save('test_with_white_background.png')
-    print(data['sketch'].size)
+    # print(data['sketch'].size)
+    
+    data['text'] = translator.translate(data['text'])
     feature = get_feature(model, data['sketch'], data['text'], task_preprocess)
     
-    score, indices = indexes.search(feature.cpu().detach().numpy().astype(np.float32), 100)
+    score, indices = indexes.search(feature.cpu().detach().numpy().astype(np.float32), 320)
     results = []    
     for i in indices[0]:
         key = list(embeddings.keys())[i]

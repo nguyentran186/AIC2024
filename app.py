@@ -279,7 +279,7 @@ def image_search():
 @app.route('/search_by_sequence', methods=['POST'], strict_slashes=False)    
 def sequence_search():
     data = request.get_json()
-    image_results = search_by_sequence(data['queries'], visual_encoder, frames_index, visual_embeddings, False)
+    image_results = search_by_sequence(data['queries'], visual_encoder, frames_index, visual_embeddings, True)
     return jsonify(image_results)
 
 @app.route('/search_by_sketch_text', methods=['POST'], strict_slashes=False)
